@@ -32,6 +32,38 @@ interface ScrapedAdvertiser {
   firstAdDate?: Date;
 }
 
+/** Convert "Xh", "X dias", "X semanas", "X meses", "X anos" to days */
+function parseDurationToDays(text: string): number {
+  const lc = text.toLowerCase().trim();
+  const numMatch = lc.match(/(\d+)/);
+  if (!numMatch) return 0;
+  const n = parseInt(numMatch[1], 10);
+  if (lc.includes('ano')) return n * 365;
+  if (lc.includes('mes') || lc.includes('mês')) return n * 30;
+  if (lc.includes('semana')) return n * 7;
+  if (lc.includes('h') && !lc.includes('dia')) return 0; // horas → 0 dias (muito novo)
+  return n; // dias
+}
+
+/** Parse Portuguese date text to JS Date */
+function parsePortugueseDate(text: string): Date | null {
+  const ptMonths: Record<string, string> = {
+    janeiro: 'January', fevereiro: 'February', março: 'March', abril: 'April',
+    maio: 'May', junho: 'June', julho: 'July', agosto: 'August',
+    setembro: 'September', outubro: 'October', novembro: 'November', dezembro: 'December',
+    jan: 'Jan', fev: 'Feb', mar: 'Mar', abr: 'Apr', mai: 'May', jun: 'Jun',
+    jul: 'Jul', ago: 'Aug', set: 'Sep', out: 'Oct', nov: 'Nov', dez: 'Dec',
+  };
+
+  let normalized = text.toLowerCase().replace(/ de /g, ' ');
+  for (const [pt, en] of Object.entries(ptMonths)) {
+    normalized = normalized.replace(new RegExp(`\\b${pt}\\b`, 'g'), en);
+  }
+
+  const d = new Date(normalized);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 export async function scrapeAdsLibrary(
   niche: string,
   keywords: string[]
@@ -40,137 +72,171 @@ export async function scrapeAdsLibrary(
   const context = await browser.newContext({
     userAgent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    locale: 'pt-BR',
   });
   const page = await context.newPage();
 
-  const results: ScrapedAdvertiser[] = [];
-  const seen = new Set<string>();
+  // Map of pageId → aggregated data
+  const advertiserMap = new Map<string, {
+    pageName: string;
+    pageUrl: string;
+    adsCount: number;
+    maxDaysActiveText: string;
+    oldestDateText: string;
+  }>();
 
   try {
     for (const keyword of keywords) {
       const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(keyword)}&sort_data[direction]=desc&sort_data[mode]=relevancy_monthly_grouped`;
 
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
+      await page.waitForTimeout(3000);
+
+      // Scroll to load more results (each scroll loads ~10-20 more ads)
+      for (let i = 0; i < 8; i++) {
+        await page.evaluate(() => window.scrollBy(0, 1400));
+        await page.waitForTimeout(700);
+      }
       await page.waitForTimeout(2000);
 
-      // Scroll to load more results
-      for (let i = 0; i < 5; i++) {
-        await page.evaluate(() => window.scrollBy(0, 1000));
-        await page.waitForTimeout(1000);
-      }
-
-      const advertisers = await page.evaluate(() => {
-        const cards = document.querySelectorAll('[data-testid="ad-library-ad-card"], [class*="x1lliihq"]');
-        const data: Array<{
-          name: string;
+      // Extract all ad cards by using <strong> with "anúncio" as anchor
+      const adCards = await page.evaluate(() => {
+        const results: Array<{
+          pageName: string;
           pageId: string;
           pageUrl: string;
-          adsCount: number;
-          firstAdDateStr?: string;
+          creativeAdsCount: number; // "N anúncios usam esse criativo"
+          durationText: string;     // "Tempo total ativo: X dias"
+          dateText: string;         // "Veiculação iniciada em X de Y de Z"
         }> = [];
 
-        cards.forEach((card) => {
-          const nameEl =
-            card.querySelector('[class*="x1heor9g"]') ||
-            card.querySelector('a[href*="/ads/library"]');
-          const countEl =
-            card.querySelector('[class*="x1cpjm7i"]') ||
-            card.querySelector('[class*="x193iq5w"]');
-          const linkEl = card.querySelector('a[href*="facebook.com"]') as HTMLAnchorElement | null;
-          
-          // Try to extract the start date (e.g. "Started running on Oct 11, 2023" or similar)
-          const dateEl = card.querySelector('span:has(> strong)'); // Usually the strong tag is inside a span next to the date
-          let firstAdDateStr: string | undefined;
+        // Find all <strong> elements that mention "anúncio(s)"
+        const anuncioStrongs = Array.from(document.querySelectorAll('strong')).filter(
+          (el) => /anúncio/i.test(el.textContent || '')
+        );
 
-          if (dateEl && dateEl.textContent) {
-             const text = dateEl.textContent;
-             const dateMatch = text.match(/(\d{1,2} [a-zA-Z]{3} \d{4}|\d{1,2} de [a-zA-Z]+ de \d{4})/i);
-             if (dateMatch) {
-               firstAdDateStr = dateMatch[1];
-             }
-          }
+        for (const strong of anuncioStrongs) {
+          // Parse "N anúncios usam esse criativo e esse texto"
+          const countMatch = (strong.textContent || '').match(/(\d+)/);
+          const creativeAdsCount = countMatch ? parseInt(countMatch[1], 10) : 1;
 
-          if (nameEl) {
-            const countText = countEl?.textContent || '';
-            const adsMatch = countText.match(/(\d+[\d,]*)/);
-            const adsCount = adsMatch
-              ? parseInt(adsMatch[1].replace(/,/g, ''), 10)
-              : 0;
+          // Walk UP the DOM to find a container with a Facebook page link
+          let cardEl: Element | null = strong;
+          let fbLink: HTMLAnchorElement | null = null;
 
-            const pageUrl = linkEl?.href || '';
-            const pageIdMatch = pageUrl.match(/id=(\d+)/);
-            const pageId = pageIdMatch ? pageIdMatch[1] : `unknown-${Math.random()}`;
+          for (let i = 0; i < 20; i++) {
+            cardEl = cardEl?.parentElement || null;
+            if (!cardEl) break;
 
-            data.push({
-              name: nameEl.textContent?.trim() || 'Unknown',
-              pageId,
-              pageUrl,
-              adsCount,
-              firstAdDateStr,
+            const links = Array.from((cardEl as HTMLElement).querySelectorAll('a[href]')) as HTMLAnchorElement[];
+            const found = links.find((a) => {
+              const href = a.href || '';
+              return (
+                href.includes('facebook.com') &&
+                !href.includes('l.facebook.com') &&
+                !href.includes('/ads/library') &&
+                !href.includes('facebook.com/ads') &&
+                (a.textContent?.trim() || '').length > 1
+              );
             });
-          }
-        });
 
-        return data;
-      });
-
-      for (const a of advertisers) {
-        if (a.adsCount >= 70 && !seen.has(a.pageId)) {
-          seen.add(a.pageId);
-          
-          let firstAdDate: Date | undefined;
-          let daysActive = 0;
-          
-          if (a.firstAdDateStr) {
-            // Need to parse portuguese and english dates if possible, but basic JS Date can handle english.
-            // For now, rough parsing - calculate from english "11 Oct 2023" or fallback.
-            // If the date parses as invalid, we'll keep daysActive = 0
-            
-            // Try to normalize Portuguese to English for the parser if necessary
-            const normalizedDateStr = a.firstAdDateStr
-              .replace(/ de /gi, ' ')
-              .replace(/jan/i, 'Jan')
-              .replace(/fev/i, 'Feb')
-              .replace(/mar/i, 'Mar')
-              .replace(/abr/i, 'Apr')
-              .replace(/mai/i, 'May')
-              .replace(/jun/i, 'Jun')
-              .replace(/jul/i, 'Jul')
-              .replace(/ago/i, 'Aug')
-              .replace(/set/i, 'Sep')
-              .replace(/out/i, 'Oct')
-              .replace(/nov/i, 'Nov')
-              .replace(/dez/i, 'Dec');
-              
-            firstAdDate = new Date(normalizedDateStr);
-            if (!isNaN(firstAdDate.getTime())) {
-              const diffTime = Math.abs(new Date().getTime() - firstAdDate.getTime());
-              daysActive = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (found) {
+              fbLink = found;
+              break;
             }
           }
-          
-          // Fallback if parsing fails or date not found
-          if (daysActive === 0) {
-             daysActive = Math.max(10, Math.floor(Math.random() * 80)); // Better fallback than static 90 which causes false positives for 'scaled'
-          }
 
-          results.push({
-            pageId: a.pageId,
-            pageName: a.name,
-            pageUrl: a.pageUrl,
-            adsActive: a.adsCount,
-            adsTotal: a.adsCount,
-            daysActive: daysActive,
-            firstAdDate: firstAdDate,
+          if (!fbLink || !cardEl) continue;
+
+          const pageUrl = fbLink.href;
+          // Extract page ID from URL: /100094909369389/ or ?id=123
+          const pageIdMatch = pageUrl.match(/facebook\.com\/(\d{8,})/) || pageUrl.match(/[?&]id=(\d+)/);
+          const pageId = pageIdMatch ? pageIdMatch[1] : '';
+          const pageName = fbLink.textContent?.trim() || '';
+
+          if (!pageId || !pageName || pageName.length < 2) continue;
+
+          const cardText = (cardEl as HTMLElement).innerText || '';
+
+          // "Tempo total ativo: X dias/semanas/meses/anos/h"
+          const durationMatch = cardText.match(/[Tt]empo total ativo[:\s·]+([^\n|·]+)/);
+          const durationText = durationMatch ? durationMatch[1].trim() : '';
+
+          // "Veiculação iniciada em 15 de mar de 2026"
+          const dateMatch = cardText.match(/[Vv]eiculação iniciada em ([^\n|·]+)/);
+          const dateText = dateMatch ? dateMatch[1].trim() : '';
+
+          results.push({ pageName, pageId, pageUrl, creativeAdsCount, durationText, dateText });
+        }
+
+        return results;
+      });
+
+      // Aggregate by pageId
+      for (const card of adCards) {
+        const existing = advertiserMap.get(card.pageId);
+        if (existing) {
+          existing.adsCount += card.creativeAdsCount;
+          // Keep the longest duration text
+          const existingDays = parseDurationToDays(existing.maxDaysActiveText);
+          const newDays = parseDurationToDays(card.durationText);
+          if (newDays > existingDays) {
+            existing.maxDaysActiveText = card.durationText;
+          }
+          // Keep the oldest date text (we'll parse later)
+          if (card.dateText && !existing.oldestDateText) {
+            existing.oldestDateText = card.dateText;
+          }
+        } else {
+          advertiserMap.set(card.pageId, {
+            pageName: card.pageName,
+            pageUrl: card.pageUrl,
+            adsCount: card.creativeAdsCount,
+            maxDaysActiveText: card.durationText,
+            oldestDateText: card.dateText,
           });
         }
       }
 
-      await page.waitForTimeout(2000); // Rate limit between keywords
+      await page.waitForTimeout(2500);
     }
   } finally {
     await browser.close();
   }
+
+  const results: ScrapedAdvertiser[] = [];
+
+  for (const [pageId, data] of advertiserMap.entries()) {
+    // Only include advertisers with enough ads to be "scaled"
+    if (data.adsCount < 5) continue;
+
+    let daysActive = parseDurationToDays(data.maxDaysActiveText);
+    let firstAdDate: Date | undefined;
+
+    // Fallback to parsing the date text
+    if (daysActive === 0 && data.oldestDateText) {
+      const parsed = parsePortugueseDate(data.oldestDateText);
+      if (parsed) {
+        firstAdDate = parsed;
+        daysActive = Math.ceil((Date.now() - parsed.getTime()) / 86400000);
+      }
+    }
+
+    if (daysActive === 0) daysActive = 1;
+
+    results.push({
+      pageId,
+      pageName: data.pageName,
+      pageUrl: data.pageUrl,
+      adsActive: data.adsCount,
+      adsTotal: data.adsCount,
+      daysActive,
+      firstAdDate,
+    });
+  }
+
+  // Sort by adsActive desc
+  results.sort((a, b) => b.adsActive - a.adsActive);
 
   return results;
 }
