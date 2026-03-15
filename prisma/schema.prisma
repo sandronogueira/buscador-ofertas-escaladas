@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Advertiser {
+  id          String    @id @default(cuid())
+  pageId      String    @unique
+  pageName    String
+  pageUrl     String
+  niche       String
+  nicheLabel  String
+  adsActive   Int       @default(0)
+  adsTotal    Int       @default(0)
+  firstAdDate DateTime?
+  daysActive  Int       @default(0)
+  score       Int       @default(0)
+  isScaled    Boolean   @default(false)
+  lastScraped DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  favorites   Favorite[]
+
+  @@index([niche])
+  @@index([isScaled])
+  @@index([score(sort: Desc)])
+}
+
+model Favorite {
+  id           String     @id @default(cuid())
+  advertiserId String
+  notes        String?
+  createdAt    DateTime   @default(now())
+  advertiser   Advertiser @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
+
+  @@unique([advertiserId])
+}
+
+model ScrapeLog {
+  id               String    @id @default(cuid())
+  niche            String
+  advertisersFound Int       @default(0)
+  scaledFound      Int       @default(0)
+  status           String
+  error            String?
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+}
