@@ -60,6 +60,9 @@ export default function Home() {
   const [logs, setLogs] = useState<ScrapeLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
+  // Job progress
+  const [jobStatus, setJobStatus] = useState<string | null>(null);
+
   const loadFavorites = useCallback(async () => {
     setLoadingFavs(true);
     const res = await fetch('/api/favorites');
@@ -120,14 +123,40 @@ export default function Home() {
       return;
     }
     setScraping(true);
-    await fetch('/api/scrape', {
+    setJobStatus('Na fila...');
+
+    const res = await fetch('/api/scrape', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ niche }),
     });
-    await searchOffers(true);
-    await loadFavorites();
-    setScraping(false);
+    const { jobId } = await res.json();
+
+    // Poll job status every 4s
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/scrape/${jobId}`);
+        const job = await r.json();
+
+        if (job.status === 'running') {
+          setJobStatus('Minerando Facebook Ads Library...');
+        } else if (job.status === 'completed') {
+          clearInterval(poll);
+          setJobStatus(`Concluído — ${job.advertisersFound ?? 0} anunciantes encontrados`);
+          await searchOffers(true);
+          await loadFavorites();
+          setScraping(false);
+          setTimeout(() => setJobStatus(null), 4000);
+        } else if (job.status === 'error') {
+          clearInterval(poll);
+          setJobStatus(`Erro: ${job.error ?? 'desconhecido'}`);
+          setScraping(false);
+          setTimeout(() => setJobStatus(null), 6000);
+        }
+      } catch {
+        // ignore transient fetch errors
+      }
+    }, 4000);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -243,6 +272,12 @@ export default function Home() {
                 </div>
               </div>
               <NicheFilters selected={niche} onSelect={setNiche} />
+              {jobStatus && (
+                <div className="mt-4 flex items-center gap-3 px-4 py-3 bg-[#242424] border border-white/10 text-sm text-[#a8a89e]">
+                  {scraping && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />}
+                  {jobStatus}
+                </div>
+              )}
             </div>
           </section>
 
@@ -263,7 +298,7 @@ export default function Home() {
                 <div className="py-20 text-center">
                   <div className="text-4xl mb-4 opacity-30 animate-pulse">◎</div>
                   <p className="text-[#78786e]">
-                    {scraping ? 'Minerando Facebook Ads Library...' : 'Carregando...'}
+                    {jobStatus ?? (scraping ? 'Minerando Facebook Ads Library...' : 'Carregando...')}
                   </p>
                 </div>
               ) : offers.length > 0 ? (

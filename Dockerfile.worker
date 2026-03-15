@@ -1,0 +1,15 @@
+# Worker-only image: runs the Playwright scraper polling loop
+FROM mcr.microsoft.com/playwright:v1.58.0-jammy
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+COPY tsconfig.json ./
+COPY src ./src/
+
+CMD ["npx", "tsx", "src/worker.ts"]

@@ -28,7 +28,7 @@ async function processNextJob() {
 
     for (const result of results) {
       const score = calculateScore(result.adsActive, result.daysActive, result.adsTotal);
-      const isScaled = result.adsActive >= 70 && result.daysActive >= 90;
+      const isScaled = result.adsActive >= 10 && result.daysActive >= 7;
 
       if (isScaled) scaledFound++;
 
