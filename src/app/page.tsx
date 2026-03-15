@@ -164,27 +164,27 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#1C1C1C] text-[#EAEAE5]">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#1C1C1C]/95 backdrop-blur-sm px-6 py-5">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#1C1C1C]/95 backdrop-blur-sm px-4 sm:px-6 py-4 sm:py-5">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <div className="w-6 h-6 border-2 border-[#EAEAE5] rounded-full flex items-center justify-center text-xs">
               ◎
             </div>
-            <span className="font-bold text-lg tracking-tight">SCALEDOFFERS</span>
+            <span className="font-bold text-sm sm:text-lg tracking-tight">SCALEDOFFERS</span>
           </div>
-          <nav className="flex gap-1">
+          <nav className="flex gap-0.5 sm:gap-1 overflow-x-auto">
             {(['buscar', 'favoritos', 'historico'] as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`px-4 py-2 text-xs font-medium uppercase tracking-wider transition-colors ${
+                className={`px-2 sm:px-4 py-2 text-[10px] sm:text-xs font-medium uppercase tracking-wider transition-colors whitespace-nowrap ${
                   tab === t
                     ? 'bg-[#EAEAE5] text-[#1C1C1C]'
                     : 'text-[#78786e] hover:text-[#EAEAE5]'
                 }`}
               >
                 {t === 'buscar' && 'Buscar'}
-                {t === 'favoritos' && `Favoritos${favoritedIds.size > 0 ? ` (${favoritedIds.size})` : ''}`}
+                {t === 'favoritos' && `Favs${favoritedIds.size > 0 ? ` (${favoritedIds.size})` : ''}`}
                 {t === 'historico' && 'Histórico'}
               </button>
             ))}
@@ -195,50 +195,52 @@ export default function Home() {
       {/* ── TAB: BUSCAR ── */}
       {tab === 'buscar' && (
         <>
-          <section className="border-b border-white/10 px-6 py-16">
+          <section className="border-b border-white/10 px-4 sm:px-6 py-10 sm:py-16">
             <div className="max-w-6xl mx-auto">
-              <h1 className="text-5xl font-semibold tracking-tight mb-4">
+              <h1 className="text-3xl sm:text-5xl font-semibold tracking-tight mb-4">
                 Ofertas
                 <br />
                 Escaladas
               </h1>
-              <p className="text-[#a8a89e] text-lg max-w-md mb-8">
+              <p className="text-[#a8a89e] text-base sm:text-lg max-w-md mb-6 sm:mb-8">
                 Encontre anunciantes com +70 anúncios ativos e mínimo 3 meses de histórico.
               </p>
-              <div className="flex gap-3 flex-wrap">
-                <span className="px-4 py-2 border border-white/10 rounded-full font-mono text-xs">70+ Ads</span>
-                <span className="px-4 py-2 border border-white/10 rounded-full font-mono text-xs">90+ Dias</span>
-                <span className="px-4 py-2 border border-white/10 rounded-full font-mono text-xs">Real-time</span>
+              <div className="flex gap-2 sm:gap-3 flex-wrap">
+                <span className="px-3 sm:px-4 py-2 border border-white/10 rounded-full font-mono text-xs">70+ Ads</span>
+                <span className="px-3 sm:px-4 py-2 border border-white/10 rounded-full font-mono text-xs">90+ Dias</span>
+                <span className="px-3 sm:px-4 py-2 border border-white/10 rounded-full font-mono text-xs">Real-time</span>
               </div>
             </div>
           </section>
 
-          <section className="border-b border-white/10 px-6 py-12">
+          <section className="border-b border-white/10 px-4 sm:px-6 py-8 sm:py-12">
             <div className="max-w-6xl mx-auto">
-              <div className="flex gap-4 mb-6 flex-wrap">
+              <div className="flex flex-col sm:flex-row gap-3 mb-6">
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Buscar por anunciante..."
-                  className="flex-1 min-w-[200px] px-5 py-4 bg-[#242424] border border-white/10 text-[#EAEAE5] placeholder-[#78786e] focus:outline-none focus:border-[#a8a89e] transition-colors"
+                  className="flex-1 px-4 sm:px-5 py-3 sm:py-4 bg-[#242424] border border-white/10 text-[#EAEAE5] placeholder-[#78786e] focus:outline-none focus:border-[#a8a89e] transition-colors"
                 />
-                <button
-                  onClick={() => searchOffers(true)}
-                  disabled={loading || scraping}
-                  className="px-8 py-4 bg-[#EAEAE5] text-[#1C1C1C] font-semibold text-sm uppercase tracking-wider hover:bg-[#d4d4c8] disabled:opacity-50 transition-colors"
-                >
-                  {loading ? 'Buscando...' : 'Buscar Ofertas'}
-                </button>
-                <button
-                  onClick={runScraper}
-                  disabled={loading || scraping || niche === 'all'}
-                  title={niche === 'all' ? 'Selecione um nicho para minerar' : 'Minerar Facebook Ads Library'}
-                  className="px-8 py-4 border border-green-400 text-green-400 font-semibold text-sm uppercase tracking-wider hover:bg-green-400 hover:text-[#1C1C1C] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  {scraping ? 'Minerando...' : '⚡ Minerar'}
-                </button>
+                <div className="flex gap-2 sm:gap-3">
+                  <button
+                    onClick={() => searchOffers(true)}
+                    disabled={loading || scraping}
+                    className="flex-1 sm:flex-none px-5 sm:px-8 py-3 sm:py-4 bg-[#EAEAE5] text-[#1C1C1C] font-semibold text-xs sm:text-sm uppercase tracking-wider hover:bg-[#d4d4c8] disabled:opacity-50 transition-colors"
+                  >
+                    {loading ? 'Buscando...' : 'Buscar'}
+                  </button>
+                  <button
+                    onClick={runScraper}
+                    disabled={loading || scraping || niche === 'all'}
+                    title={niche === 'all' ? 'Selecione um nicho para minerar' : 'Minerar Facebook Ads Library'}
+                    className="flex-1 sm:flex-none px-5 sm:px-8 py-3 sm:py-4 border border-green-400 text-green-400 font-semibold text-xs sm:text-sm uppercase tracking-wider hover:bg-green-400 hover:text-[#1C1C1C] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {scraping ? 'Minerando...' : '⚡ Minerar'}
+                  </button>
+                </div>
               </div>
               <NicheFilters selected={niche} onSelect={setNiche} />
             </div>
@@ -302,7 +304,7 @@ export default function Home() {
 
       {/* ── TAB: FAVORITOS ── */}
       {tab === 'favoritos' && (
-        <section className="px-6 py-12">
+        <section className="px-4 sm:px-6 py-8 sm:py-12">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center gap-4 mb-8">
               <h2 className="text-3xl font-semibold">Favoritos</h2>
@@ -351,7 +353,7 @@ export default function Home() {
 
       {/* ── TAB: HISTÓRICO ── */}
       {tab === 'historico' && (
-        <section className="px-6 py-12">
+        <section className="px-4 sm:px-6 py-8 sm:py-12">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center gap-4 mb-8">
               <h2 className="text-3xl font-semibold">Histórico de Minerações</h2>
@@ -369,8 +371,8 @@ export default function Home() {
               </div>
             ) : logs.length > 0 ? (
               <div className="border border-white/10">
-                {/* Header */}
-                <div className="grid grid-cols-[1fr_120px_80px_80px_120px_100px] gap-4 px-6 py-3 bg-[#242424] text-[10px] text-[#78786e] uppercase tracking-wider">
+                {/* Desktop header */}
+                <div className="hidden sm:grid grid-cols-[1fr_120px_80px_80px_100px_100px] gap-4 px-6 py-3 bg-[#242424] text-[10px] text-[#78786e] uppercase tracking-wider">
                   <span>Nicho</span>
                   <span>Início</span>
                   <span>Encontrados</span>
@@ -387,32 +389,42 @@ export default function Home() {
                       : null;
 
                   return (
-                    <div
-                      key={log.id}
-                      className="grid grid-cols-[1fr_120px_80px_80px_120px_100px] gap-4 px-6 py-4 border-t border-white/10 hover:bg-[#242424] transition-colors items-center"
-                    >
-                      <span className="font-medium capitalize">{log.niche}</span>
-                      <span className="text-sm text-[#78786e] font-mono">
-                        {new Date(log.startedAt).toLocaleString('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                      <span className="font-mono text-sm">{log.advertisersFound}</span>
-                      <span className="font-mono text-sm text-green-400">{log.scaledFound}</span>
-                      <span className="font-mono text-sm text-[#78786e]">
-                        {duration !== null ? `${duration}s` : '—'}
-                      </span>
-                      <span className={`text-xs font-medium ${statusColor[log.status] ?? 'text-[#78786e]'}`}>
-                        {statusLabel[log.status] ?? log.status}
-                        {log.error && (
-                          <span className="block text-[10px] text-red-400 truncate max-w-[100px]" title={log.error}>
-                            {log.error}
+                    <div key={log.id} className="border-t border-white/10 hover:bg-[#242424] transition-colors">
+                      {/* Desktop row */}
+                      <div className="hidden sm:grid grid-cols-[1fr_120px_80px_80px_100px_100px] gap-4 px-6 py-4 items-center">
+                        <span className="font-medium capitalize">{log.niche}</span>
+                        <span className="text-sm text-[#78786e] font-mono">
+                          {new Date(log.startedAt).toLocaleString('pt-BR', {
+                            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+                          })}
+                        </span>
+                        <span className="font-mono text-sm">{log.advertisersFound}</span>
+                        <span className="font-mono text-sm text-green-400">{log.scaledFound}</span>
+                        <span className="font-mono text-sm text-[#78786e]">{duration !== null ? `${duration}s` : '—'}</span>
+                        <span className={`text-xs font-medium ${statusColor[log.status] ?? 'text-[#78786e]'}`}>
+                          {statusLabel[log.status] ?? log.status}
+                        </span>
+                      </div>
+                      {/* Mobile card */}
+                      <div className="sm:hidden px-4 py-4 flex items-center justify-between gap-3">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <span className="font-medium capitalize">{log.niche}</span>
+                          <span className="text-xs text-[#78786e] font-mono">
+                            {new Date(log.startedAt).toLocaleString('pt-BR', {
+                              day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+                            })}
                           </span>
-                        )}
-                      </span>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0 text-right">
+                          <div className="text-center">
+                            <div className="font-mono text-sm text-green-400">{log.scaledFound}</div>
+                            <div className="text-[9px] text-[#78786e] uppercase">escalados</div>
+                          </div>
+                          <span className={`text-xs font-medium ${statusColor[log.status] ?? 'text-[#78786e]'}`}>
+                            {statusLabel[log.status] ?? log.status}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
