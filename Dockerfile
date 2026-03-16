@@ -1,14 +1,17 @@
-# Base image
-FROM mcr.microsoft.com/playwright:v1.44.0-jammy
+# Base image — must match the playwright version in package.json
+FROM mcr.microsoft.com/playwright:v1.52.0-jammy
 
 # Set working directory
 WORKDIR /app
 
+# Force production environment for the build
+ENV NODE_ENV=production
+
 # Copy package files
 COPY package.json package-lock.json ./
 
-# Install dependencies
-RUN npm ci
+# Install ALL dependencies (including devDependencies needed for build)
+RUN npm ci --include=dev
 
 # Copy Prisma schema and generate client
 COPY prisma ./prisma/

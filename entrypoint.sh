@@ -1,17 +1,23 @@
-#!/bin/sh
+#!/bin/bash
+set -e
 
-# Start the Next.js web application
+echo "Starting Next.js web server..."
 npm run start &
 WEB_PID=$!
 
-# Start the background polling worker
-npm run worker &
+echo "Starting background worker..."
+npx tsx src/worker.ts &
 WORKER_PID=$!
 
-echo "Web server and worker started."
+echo "Web PID=$WEB_PID | Worker PID=$WORKER_PID"
 
-# Wait for any process to exit
-wait -n
+# If either process dies, kill the other and exit
+trap "kill $WEB_PID $WORKER_PID 2>/dev/null; exit 1" SIGTERM SIGINT
 
-# Exit with status of process that exited first
-exit $?
+# Wait for either to finish
+wait -n 2>/dev/null || wait $WEB_PID
+EXIT_CODE=$?
+
+echo "A process exited with code $EXIT_CODE. Shutting down..."
+kill $WEB_PID $WORKER_PID 2>/dev/null
+exit $EXIT_CODE
