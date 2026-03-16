@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { OfferCard } from '@/components/offer-card';
 import { NicheFilters } from '@/components/niche-filters';
 
@@ -62,6 +62,7 @@ export default function Home() {
 
   // Job progress
   const [jobStatus, setJobStatus] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadFavorites = useCallback(async () => {
     setLoadingFavs(true);
@@ -82,6 +83,7 @@ export default function Home() {
 
   useEffect(() => {
     loadFavorites();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [loadFavorites]);
 
   useEffect(() => {
@@ -133,7 +135,7 @@ export default function Home() {
     const { jobId } = await res.json();
 
     // Poll job status every 4s
-    const poll = setInterval(async () => {
+    pollRef.current = setInterval(async () => {
       try {
         const r = await fetch(`/api/scrape/${jobId}`);
         const job = await r.json();
@@ -141,14 +143,16 @@ export default function Home() {
         if (job.status === 'running') {
           setJobStatus('Minerando Facebook Ads Library...');
         } else if (job.status === 'completed') {
-          clearInterval(poll);
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
           setJobStatus(`Concluído — ${job.advertisersFound ?? 0} anunciantes encontrados`);
           await searchOffers(true);
           await loadFavorites();
           setScraping(false);
           setTimeout(() => setJobStatus(null), 4000);
         } else if (job.status === 'error') {
-          clearInterval(poll);
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
           setJobStatus(`Erro: ${job.error ?? 'desconhecido'}`);
           setScraping(false);
           setTimeout(() => setJobStatus(null), 6000);
