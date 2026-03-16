@@ -68,7 +68,17 @@ export async function scrapeAdsLibrary(
   niche: string,
   keywords: string[]
 ): Promise<ScrapedAdvertiser[]> {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-zygote',
+      '--single-process',
+    ],
+  });
   const context = await browser.newContext({
     userAgent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -89,15 +99,15 @@ export async function scrapeAdsLibrary(
     for (const keyword of keywords) {
       const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(keyword)}&sort_data[direction]=desc&sort_data[mode]=relevancy_monthly_grouped`;
 
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
-      await page.waitForTimeout(3000);
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForTimeout(2500);
 
-      // Scroll to load more results (each scroll loads ~10-20 more ads)
-      for (let i = 0; i < 8; i++) {
+      // Scroll to load more results
+      for (let i = 0; i < 5; i++) {
         await page.evaluate(() => window.scrollBy(0, 1400));
-        await page.waitForTimeout(700);
+        await page.waitForTimeout(600);
       }
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1500);
 
       // Extract all ad cards by using <strong> with "anúncio" as anchor
       const adCards = await page.evaluate(() => {

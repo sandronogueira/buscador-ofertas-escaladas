@@ -134,6 +134,17 @@ export default function Home() {
     });
     const { jobId } = await res.json();
 
+    // Safety: stop polling after 6 minutes regardless
+    const safetyTimer = setTimeout(() => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      setJobStatus('Tempo esgotado — verifique o histórico em alguns minutos');
+      setScraping(false);
+      setTimeout(() => setJobStatus(null), 6000);
+    }, 6 * 60 * 1000);
+
     // Poll job status every 4s
     pollRef.current = setInterval(async () => {
       try {
@@ -143,6 +154,7 @@ export default function Home() {
         if (job.status === 'running') {
           setJobStatus('Minerando Facebook Ads Library...');
         } else if (job.status === 'completed') {
+          clearTimeout(safetyTimer);
           clearInterval(pollRef.current!);
           pollRef.current = null;
           setJobStatus(`Concluído — ${job.advertisersFound ?? 0} anunciantes encontrados`);
@@ -151,6 +163,7 @@ export default function Home() {
           setScraping(false);
           setTimeout(() => setJobStatus(null), 4000);
         } else if (job.status === 'error') {
+          clearTimeout(safetyTimer);
           clearInterval(pollRef.current!);
           pollRef.current = null;
           setJobStatus(`Erro: ${job.error ?? 'desconhecido'}`);

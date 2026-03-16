@@ -1,20 +1,18 @@
 import { prisma } from './lib/prisma';
 import { scrapeAdsLibrary, calculateScore, NICHES } from './lib/scraper';
 
+const JOB_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes max per job
+
 async function processNextJob() {
-  // Find the oldest pending job
   const job = await prisma.scrapeLog.findFirst({
     where: { status: 'pending' },
     orderBy: { startedAt: 'asc' },
   });
 
-  if (!job) {
-    return false; // No jobs found
-  }
+  if (!job) return false;
 
-  console.log(`[Worker] Started processing job ${job.id} for niche: ${job.niche}`);
+  console.log(`[Worker] Processing job ${job.id} — niche: ${job.niche}`);
 
-  // Mark as running
   await prisma.scrapeLog.update({
     where: { id: job.id },
     data: { status: 'running' },
@@ -22,14 +20,20 @@ async function processNextJob() {
 
   try {
     const keywords = NICHES[job.niche] || [job.niche];
-    const results = await scrapeAdsLibrary(job.niche, keywords);
+
+    // Wrap scrape in a timeout so a crashed Playwright doesn't hang forever
+    const results = await Promise.race([
+      scrapeAdsLibrary(job.niche, keywords),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Scrape timeout after 5 minutes')), JOB_TIMEOUT_MS)
+      ),
+    ]);
 
     let scaledFound = 0;
 
     for (const result of results) {
       const score = calculateScore(result.adsActive, result.daysActive, result.adsTotal);
       const isScaled = result.adsActive >= 10 && result.daysActive >= 7;
-
       if (isScaled) scaledFound++;
 
       await prisma.advertiser.upsert({
@@ -58,7 +62,6 @@ async function processNextJob() {
       });
     }
 
-    // Mark as completed
     await prisma.scrapeLog.update({
       where: { id: job.id },
       data: {
@@ -69,45 +72,45 @@ async function processNextJob() {
       },
     });
 
-    console.log(`[Worker] Completed job ${job.id}. Found ${results.length} advertisers (${scaledFound} scaled).`);
+    console.log(`[Worker] Done job ${job.id} — ${results.length} advertisers (${scaledFound} scaled)`);
     return true;
   } catch (error) {
-    console.error(`[Worker] Error processing job ${job.id}:`, error);
-    
-    // Mark as error
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[Worker] Error job ${job.id}:`, msg);
+
     await prisma.scrapeLog.update({
       where: { id: job.id },
-      data: {
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        completedAt: new Date(),
-      },
+      data: { status: 'error', error: msg, completedAt: new Date() },
     });
-    
-    return true; // Return true because a job was processed (even if it failed), so we can check for another
+
+    return true;
+  }
+}
+
+async function resetStuckJobs() {
+  // On startup, mark any "running" jobs as error (they were interrupted by a restart)
+  const stuck = await prisma.scrapeLog.updateMany({
+    where: { status: 'running' },
+    data: { status: 'error', error: 'Worker restarted — job interrupted', completedAt: new Date() },
+  });
+  if (stuck.count > 0) {
+    console.log(`[Worker] Reset ${stuck.count} stuck job(s) from previous run`);
   }
 }
 
 async function startWorker() {
-  console.log('[Worker] Started DB Polling Queue Worker');
-  
+  console.log('[Worker] Started');
+  await resetStuckJobs();
+
   while (true) {
     try {
-      const processedJob = await processNextJob();
-      
-      // If no jobs were found, sleep for 5 seconds to prevent DB spam
-      if (!processedJob) {
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      } else {
-        // Just a tiny sleep between jobs to breathe
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
+      const processed = await processNextJob();
+      await new Promise((resolve) => setTimeout(resolve, processed ? 1000 : 5000));
     } catch (err) {
-      console.error('[Worker] Fatal error in polling loop', err);
-      await new Promise((resolve) => setTimeout(resolve, 10000)); // sleep longer on fatal error
+      console.error('[Worker] Fatal error:', err);
+      await new Promise((resolve) => setTimeout(resolve, 10000));
     }
   }
 }
 
-// Start the worker
 startWorker();

@@ -1,8 +1,7 @@
 #!/bin/sh
 
-# Start the Next.js web application in the background
-PORT=${PORT:-3000}
-npx next start -H 0.0.0.0 -p $PORT &
+# Start the Next.js web application
+npm run start &
 WEB_PID=$!
 
 # Start the background polling worker
