@@ -7,7 +7,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  serverExternalPackages: ['playwright', '@playwright/test', 'playwright-core'],
 };
 
 export default nextConfig;
