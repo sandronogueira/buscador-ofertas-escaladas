@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   const limit = 20;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const where: any = {};
+  const where: any = { isScaled: true };
 
   if (niche && niche !== 'all') where.niche = niche;
   if (search) where.pageName = { contains: search, mode: 'insensitive' };

@@ -289,12 +289,6 @@ export default function Home() {
                 </div>
               </div>
               <NicheFilters selected={niche} onSelect={setNiche} />
-              {jobStatus && (
-                <div className="mt-4 flex items-center gap-3 px-4 py-3 bg-[#242424] border border-white/10 text-sm text-[#a8a89e]">
-                  {scraping && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />}
-                  {jobStatus}
-                </div>
-              )}
             </div>
           </section>
 
@@ -494,8 +488,17 @@ export default function Home() {
         </section>
       )}
 
-      {/* Footer */}
-      <footer className="mt-20 py-12 bg-[#242424] text-center">
+      {/* Footer & Global Progress */}
+      {jobStatus && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#242424]/95 backdrop-blur-sm px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.5)] flex justify-center">
+          <div className="flex items-center gap-3 text-sm text-[#a8a89e]">
+            {scraping && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />}
+            {jobStatus}
+          </div>
+        </div>
+      )}
+
+      <footer className="mt-20 py-12 bg-[#242424] text-center border-t border-white/10">
         <span className="font-mono text-xs text-[#78786e] uppercase tracking-wider">
           ScaledOffers — Minerador de Ofertas Escaladas
         </span>

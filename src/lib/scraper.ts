@@ -103,11 +103,11 @@ export async function scrapeAdsLibrary(
       await page.waitForTimeout(2500);
 
       // Scroll deep to load many results (need lots of ads to find 70+ per advertiser)
-      for (let i = 0; i < 25; i++) {
+      for (let i = 0; i < 50; i++) {
         await page.evaluate(() => window.scrollBy(0, 2000));
-        await page.waitForTimeout(400);
+        await page.waitForTimeout(500);
       }
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(1500);
 
       // Extract all ad cards by using <strong> with "anúncio" as anchor
       const adCards = await page.evaluate(() => {
@@ -217,8 +217,8 @@ export async function scrapeAdsLibrary(
   const results: ScrapedAdvertiser[] = [];
 
   for (const [pageId, data] of advertiserMap.entries()) {
-    // Only include advertisers with enough ads to be "scaled"
-    if (data.adsCount < 5) continue;
+    // Only include advertisers with 70+ active ads (scaled offers)
+    if (data.adsCount < 70) continue;
 
     let daysActive = parseDurationToDays(data.maxDaysActiveText);
     let firstAdDate: Date | undefined;
