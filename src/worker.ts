@@ -33,7 +33,7 @@ async function processNextJob() {
 
     for (const result of results) {
       const score = calculateScore(result.adsActive, result.daysActive, result.adsTotal);
-      const isScaled = result.adsActive >= 10 && result.daysActive >= 7;
+      const isScaled = result.adsActive >= 5;
       if (isScaled) scaledFound++;
 
       await prisma.advertiser.upsert({

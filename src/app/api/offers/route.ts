@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     isScaled: boolean;
     niche?: string;
     pageName?: { contains: string; mode: 'insensitive' };
-  } = { isScaled: true };
+  } = {} as { isScaled?: boolean; niche?: string; pageName?: { contains: string; mode: 'insensitive' } };
 
   if (niche && niche !== 'all') where.niche = niche;
   if (search) where.pageName = { contains: search, mode: 'insensitive' };
