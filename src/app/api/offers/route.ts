@@ -8,11 +8,8 @@ export async function GET(req: Request) {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const limit = 20;
 
-  const where: {
-    isScaled: boolean;
-    niche?: string;
-    pageName?: { contains: string; mode: 'insensitive' };
-  } = {} as { isScaled?: boolean; niche?: string; pageName?: { contains: string; mode: 'insensitive' } };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: any = {};
 
   if (niche && niche !== 'all') where.niche = niche;
   if (search) where.pageName = { contains: search, mode: 'insensitive' };
