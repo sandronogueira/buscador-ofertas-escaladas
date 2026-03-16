@@ -102,12 +102,12 @@ export async function scrapeAdsLibrary(
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(2500);
 
-      // Scroll to load more results
-      for (let i = 0; i < 5; i++) {
-        await page.evaluate(() => window.scrollBy(0, 1400));
-        await page.waitForTimeout(600);
+      // Scroll deep to load many results (need lots of ads to find 70+ per advertiser)
+      for (let i = 0; i < 25; i++) {
+        await page.evaluate(() => window.scrollBy(0, 2000));
+        await page.waitForTimeout(400);
       }
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(1000);
 
       // Extract all ad cards by using <strong> with "anúncio" as anchor
       const adCards = await page.evaluate(() => {
@@ -234,10 +234,13 @@ export async function scrapeAdsLibrary(
 
     if (daysActive === 0) daysActive = 1;
 
+    // Link to the advertiser's Ad Library page (not Facebook profile)
+    const adLibraryUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&view_all_page_id=${pageId}`;
+
     results.push({
       pageId,
       pageName: data.pageName,
-      pageUrl: data.pageUrl,
+      pageUrl: adLibraryUrl,
       adsActive: data.adsCount,
       adsTotal: data.adsCount,
       daysActive,

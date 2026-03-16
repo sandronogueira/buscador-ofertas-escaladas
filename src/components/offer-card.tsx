@@ -98,7 +98,7 @@ export function OfferCard({ offer, isFavorited = false, onToggleFavorite }: Prop
         <ScoreRing score={offer.score} />
         <div className="flex gap-2">
           <a
-            href={offer.pageUrl || `https://www.facebook.com/ads/library/?id=${offer.id}`}
+            href={offer.pageUrl || `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&view_all_page_id=${offer.id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="px-3 sm:px-4 py-2 bg-[#EAEAE5] text-[#1C1C1C] text-[10px] sm:text-[11px] font-medium uppercase tracking-wider hover:bg-[#d4d4c8] transition-colors"
